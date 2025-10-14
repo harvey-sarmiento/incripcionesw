@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Sorteo Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 min-h-screen p-4">
+    <div id="app" class="max-w-4xl mx-auto"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [participantes, setParticipantes] = useState([]);
+            const [nombreNuevo, setNombreNuevo] = useState('');
+            const [busqueda, setBusqueda] = useState('');
+            const [vista, setVista] = useState('registro');
+            const [historial, setHistorial] = useState([]);
+            const [nombreSorteo, setNombreSorteo] = useState('');
+
+            useEffect(() => {
+                const datos = localStorage.getItem('sorteoActual');
+                const hist = localStorage.getItem('historialSorteos');
+                const nombre = localStorage.getItem('nombreSorteo');
+                if (datos) setParticipantes(JSON.parse(datos));
+                if (hist) setHistorial(JSON.parse(hist));
+                if (nombre) setNombreSorteo(nombre);
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('sorteoActual', JSON.stringify(participantes));
+            }, [participantes]);
+
+            useEffect(() => {
+                localStorage.setItem('historialSorteos', JSON.stringify(historial));
+            }, [historial]);
+
+            useEffect(() => {
+                localStorage.setItem('nombreSorteo', nombreSorteo);
+            }, [nombreSorteo]);
+
+            const generarNumeros = () => {
+                const nums = new Set();
+                while (nums.size < 10) {
+                    nums.add(Math.floor(Math.random() * 10000).toString().padStart(4, '0'));
+                }
+                return Array.from(nums).sort();
+            };
+
+            const agregar = () => {
+                if (!nombreNuevo.trim()) return alert('Ingresa un nombre');
+                if (participantes.some(p => p.nombre.toLowerCase() === nombreNuevo.toLowerCase())) {
+                    return alert('Ya existe');
+                }
+                setParticipantes([...participantes, {
+                    id: Date.now(),
+                    nombre: nombreNuevo.trim(),
+                    numeros: generarNumeros(),
+                    fecha: new Date().toLocaleString()
+                }]);
+                setNombreNuevo('');
+            };
+
+            const eliminar = (id) => {
+                if (confirm('¿Eliminar?')) {
+                    setParticipantes(participantes.filter(p => p.id !== id));
+                }
+            };
+
+            const archivar = () => {
+                if (participantes.length === 0) return alert('No hay participantes');
+                if (!confirm('¿Archivar sorteo actual?')) return;
+                const nombre = nombreSorteo || prompt('Nombre del sorteo:', 'Sorteo ' + new Date().toLocaleDateString());
+                if (!nombre) return;
+                setHistorial([{
+                    id: Date.now(),
+                    nombre,
+                    participantes: [...participantes],
+                    fecha: new Date().toLocaleString(),
+                    total: participantes.length
+                }, ...historial]);
+                setParticipantes([]);
+                setNombreSorteo('');
+                setVista('registro');
+                alert('¡Sorteo archivado!');
+            };
+
+            const exportar = () => {
+                if (participantes.length === 0) return alert('No hay datos');
+                let txt = SORTEO: ${nombreSorteo || 'Actual'}\n;
+                txt += Fecha: ${new Date().toLocaleString()}\n;
+                txt += Total: ${participantes.length}\n\n;
+                participantes.forEach((p, i) => {
+                    txt += ${i + 1}. ${p.nombre}\n;
+                    txt += `   Números: ${p.numeros.join(' - ')}\n\n`;
+                });
+                const blob = new Blob([txt], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = sorteo-${Date.now()}.txt;
+                a.click();
+            };
+
+            const filtrados = participantes.filter(p =>
+                p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                p.numeros.some(n => n.includes(busqueda))
+            );
+
+            return (
+                <div>
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">
+                            🎟️ Sistema de Sorteo Online
+                        </h1>
+                        <p className="text-center text-green-600 font-semibold mb-4">
+                            ✅ Datos guardados automáticamente
+                        </p>
+                        <input
+                            type="text"
+                            value={nombreSorteo}
+                            onChange={(e) => setNombreSorteo(e.target.value)}
+                            placeholder="Nombre del sorteo"
+                            className="w-full px-4 py-2 border-2 rounded-lg text-center"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                        <button onClick={archivar} disabled={!participantes.length}
+                            className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold">
+                            📦 Archivar y Nuevo
+                        </button>
+                        <button onClick={exportar} disabled={!participantes.length}
+                            className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold">
+                            💾 Exportar
+                        </button>
+                    </div>
+
+                    <div className="flex gap-2 mb-6">
+                        <button onClick={() => setVista('registro')}
+                            className={flex-1 py-3 rounded-xl font-semibold ${vista === 'registro' ? 'bg-white text-purple-600' : 'bg-white/30 text-white'}}>
+                            ➕ Registrar
+                        </button>
+                        <button onClick={() => setVista('buscar')}
+                            className={flex-1 py-3 rounded-xl font-semibold ${vista === 'buscar' ? 'bg-white text-purple-600' : 'bg-white/30 text-white'}}>
+                            🔍 Buscar
+                        </button>
+                        <button onClick={() => setVista('historial')}
+                            className={flex-1 py-3 rounded-xl font-semibold ${vista === 'historial' ? 'bg-white text-purple-600' : 'bg-white/30 text-white'}}>
+                            📚 Historial ({historial.length})
+                        </button>
+                    </div>
+
+                    {vista === 'registro' && (
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                            <h2 className="text-2xl font-bold mb-4">👥 Nuevo Participante</h2>
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    value={nombreNuevo}
+                                    onChange={(e) => setNombreNuevo(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && agregar()}
+                                    placeholder="Nombre"
+                                    className="flex-1 px-4 py-3 border-2 rounded-xl text-lg"
+                                />
+                                <button onClick={agregar}
+                                    className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold">
+                                    Agregar
+                                </button>
+                            </div>
+                            <p className="mt-4 text-gray-700">Total: {participantes.length}</p>
+                        </div>
+                    )}
+
+                    {vista === 'buscar' && (
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                            <h2 className="text-2xl font-bold mb-4">🔍 Buscar</h2>
+                            <input
+                                type="text"
+                                value={busqueda}
+                                onChange={(e) => setBusqueda(e.target.value)}
+                                placeholder="Busca por nombre o número"
+                                className="w-full px-4 py-3 border-2 rounded-xl text-lg"
+                            />
+                        </div>
+                    )}
+
+                    {vista === 'historial' && (
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                            <h2 className="text-2xl font-bold mb-4">📚 Historial</h2>
+                            {historial.length === 0 ? (
+                                <p className="text-gray-500 text-center py-8">No hay sorteos archivados</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {historial.map(s => (
+                                        <div key={s.id} className="border-2 rounded-xl p-4">
+                                            <h3 className="font-bold text-lg">{s.nombre}</h3>
+                                            <p className="text-sm text-gray-500">{s.fecha} • {s.total} participantes</p>
+                                            <details className="mt-2">
+                                                <summary className="text-purple-600 cursor-pointer font-semibold">Ver detalles</summary>
+                                                <div className="mt-3 space-y-2">
+                                                    {s.participantes.map(p => (
+                                                        <div key={p.id} className="bg-gray-50 p-3 rounded">
+                                                            <p className="font-semibold">{p.nombre}</p>
+                                                            <p className="text-sm">{p.numeros.join(' - ')}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {(vista === 'registro' || vista === 'buscar') && (
+                        <div className="space-y-4">
+                            {filtrados.length === 0 ? (
+                                <div className="bg-white rounded-2xl p-8 text-center">
+                                    <p className="text-gray-500">
+                                        {participantes.length === 0 ? 'No hay participantes' : 'Sin resultados'}
+                                    </p>
+                                </div>
+                            ) : (
+                                filtrados.map(p => (
+                                    <div key={p.id} className="bg-white rounded-2xl shadow-lg p-6">
+                                        <div className="flex justify-between mb-4">
+                                            <div>
+                                                <h3 className="text-2xl font-bold">{p.nombre}</h3>
+                                                <p className="text-sm text-gray-500">{p.fecha}</p>
+                                            </div>
+                                            <button onClick={() => eliminar(p.id)}
+                                                className="text-red-500 hover:bg-red-50 px-3 rounded">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                        <div className="border-t-2 pt-4">
+                                            <p className="text-sm font-semibold mb-3">Números:</p>
+                                            <div className="grid grid-cols-5 gap-3">
+                                                {p.numeros.map((num, i) => (
+                                                    <div key={i} className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold text-xl py-3 rounded-xl text-center">
+                                                        {num}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('app'));
+    </script>
+</body>
+</html>
